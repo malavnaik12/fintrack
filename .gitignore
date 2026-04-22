@@ -1,7 +1,10 @@
 # Folders
 __pycache__
 data*
+venv*
 
 # Files
-test_*.py
 *.txt
+**/*.pdf
+old_version/*
+.env
