@@ -40,12 +40,6 @@ class DocumentParser:
     def extract_text(self, file_path: str) -> str:
         """
         Open the PDF at file_path and return all pages joined as a single string.
-
-        TODO:
-        - Open the PDF with pdfplumber
-        - Iterate over pdf.pages
-        - Call extract_text() on each page, defaulting to "" if it returns None
-        - Join all pages with a newline and return the result
         """
         with pdfplumber.open(file_path) as pdf:
             pages_text = []
@@ -57,24 +51,33 @@ class DocumentParser:
 class Ingestor:
     """
     Orchestrates the full ingestion flow for a single PDF statement.
+    Owns the DB engine and delegates parsing to DocumentParser.
     """
 
     def __init__(self, db_path: str):
-        # TODO:
-        # - Create an engine using get_engine(db_path)
-        # - Call init_db to ensure tables exist
-        # - Instantiate a DocumentParser and store it on self
-        pass
+        """
+        Initialise the Ingestor with a path to the SQLite database.
+        Creates the engine, ensures all tables exist, and prepares a parser.
+
+        Args:
+            db_path: Absolute or relative path to the SQLite .db file.
+        """
+        self.engine = get_engine(db_path)
+        init_db(self.engine)
+        self.parser = DocumentParser()
 
     def _compute_hash(self, file_path: str) -> str:
         """
-        Return the SHA-256 hex digest of the file at file_path.
+        Compute and return the SHA-256 hex digest of the file at file_path.
+        Used as the dedup key — re-ingesting the same file is a no-op.
 
-        TODO:
-        - Read the file as bytes
-        - Return hashlib.sha256(<bytes>).hexdigest()
+        Args:
+            file_path: Path to the PDF file to hash.
+
+        Returns:
+            64-character lowercase hex string (SHA-256 digest).
         """
-        pass
+        return hashlib.sha256(Path(file_path).read_bytes()).hexdigest()
 
     def ingest(
         self,
@@ -85,16 +88,37 @@ class Ingestor:
         statement_period_end: date,
     ) -> RawDocument | None:
         """
-        Full ingestion flow for one PDF. Returns the RawDocument on success,
-        or None if the file was already ingested (duplicate hash).
+        Full ingestion flow for one PDF statement.
 
-        TODO:
-        - Compute the file hash
-        - Check if a row already exists in raw_documents with that hash
-          (hint: use row_exists — if it does, print a skip message and return None)
-        - Extract text from the PDF using self.parser
-        - Build a RawDocument model (don't set parsed=True yet — that's the normalizer's job)
-        - Insert it into the DB
-        - Return the RawDocument
+        Computes the file hash, skips silently if already ingested, otherwise
+        extracts text, builds a RawDocument, persists it, and returns it.
+        The parsed flag is left False — the normalizer flips it after Step 2.
+
+        Args:
+            file_path:               Absolute path to the PDF on disk.
+            document_type:           CREDIT or DEBIT (DocumentType enum).
+            institution:             Human-readable bank name e.g. "TD", "RBC".
+            statement_period_start:  First date covered by the statement.
+            statement_period_end:    Last date covered by the statement.
+
+        Returns:
+            The persisted RawDocument, or None if the file was already ingested.
         """
-        pass
+        file_hash = self._compute_hash(file_path)
+
+        with self.engine.connect() as conn:
+            if row_exists(conn, raw_documents, "file_hash", file_hash):
+                print(f"[ingestor] skipping {file_path} — already ingested")
+                return None
+
+            doc = RawDocument(
+                file_path=str(file_path),
+                file_hash=file_hash,
+                document_type=document_type,
+                institution=institution,
+                statement_period_start=statement_period_start,
+                statement_period_end=statement_period_end,
+            )
+
+            insert_row(conn, raw_documents, doc.model_dump())
+            return doc
