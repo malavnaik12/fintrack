@@ -1,6 +1,5 @@
 # Folders
 __pycache__
-data*
 venv*
 
 # Files
@@ -10,6 +9,7 @@ old_version/*
 .env
 .claude/*
 CLAUDE.md
+**/*.db
 
 # Other
 **/*egg-info
