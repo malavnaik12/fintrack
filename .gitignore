@@ -1,11 +1,10 @@
 # Folders
 __pycache__
-data*
 venv*
+.pytest_cache
 
 # Files
 # *.txt
-**/*.pdf
 old_version/*
 .env
 .claude/*

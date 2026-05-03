@@ -1,7 +1,7 @@
 """
 core/models.py
 
-Pydantic v2 models for fin_intel.
+Pydantic v2 models for FinTrack.
 These are the canonical data shapes — every layer of the system reads/writes these.
 """
 
