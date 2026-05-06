@@ -193,6 +193,18 @@ def row_exists(conn: Connection, table: Table, column: str, value: Any) -> bool:
     return result.fetchone() is not None
 
 
+def fetch_row(
+    conn: Connection, table: Table, column: str, value: Any
+) -> dict[str, Any]:
+    """
+    Check if a row exists by a single column value.
+    Primary use: dedup checks (file_hash, raw_name, transaction id).
+    """
+    col = table.c[column]
+    result = conn.execute(select(table).where(col == value).limit(1))
+    return result.fetchone()
+
+
 def fetch_all(
     conn: Connection,
     table: Table,
